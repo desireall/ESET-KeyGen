@@ -7,7 +7,7 @@ on:
 
 jobs:
   call-eset:
-    uses: ./.github/workflows/eset.yml
+    uses: ./.github/workflows/eset-v2.yml
     with:
       account: '0'
       key: '1'
