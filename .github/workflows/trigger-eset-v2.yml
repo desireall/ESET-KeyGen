@@ -1,68 +1,38 @@
-name: Trigger Generator V2
+name: Scheduled Generate v2
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '0 0 1,21 * *' # 每月1号和21号执行
+    - cron: '0 0 1,21 * *' # 每月1号和21号 UTC 00:00（可改）
+  workflow_dispatch: # 也支持手动执行
 
 jobs:
-  prepare-params:
-    runs-on: ubuntu-latest
-    outputs:
-      account: ${{ steps.set-vars.outputs.account }}
-      key: ${{ steps.set-vars.outputs.key }}
-      mail: ${{ steps.set-vars.outputs.mail }}
-      key_type: ${{ steps.set-vars.outputs.key_type }}
-      os: ${{ steps.set-vars.outputs.os }}
-      branch: ${{ steps.set-vars.outputs.branch }}
-    steps:
-      - id: set-vars
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "account=${{ github.event.inputs.account || '0' }}" >> $GITHUB_OUTPUT
-            echo "key=${{ github.event.inputs.key || '1' }}" >> $GITHUB_OUTPUT
-            echo "mail=${{ github.event.inputs.mail || 'fakemail' }}" >> $GITHUB_OUTPUT
-            echo "key_type=${{ github.event.inputs.key_type || '--vpn-codes' }}" >> $GITHUB_OUTPUT
-            echo "os=${{ github.event.inputs.os || 'Linux' }}" >> $GITHUB_OUTPUT
-            echo "branch=${{ github.event.inputs.branch || 'main' }}" >> $GITHUB_OUTPUT
-          else
-            echo "account=0" >> $GITHUB_OUTPUT
-            echo "key=1" >> $GITHUB_OUTPUT
-            echo "mail=fakemail" >> $GITHUB_OUTPUT
-            echo "key_type=--vpn-codes" >> $GITHUB_OUTPUT
-            echo "os=Linux" >> $GITHUB_OUTPUT
-            echo "branch=main" >> $GITHUB_OUTPUT
-          fi
-
   call-eset:
-    needs: prepare-params
-    uses: ./.github/workflows/eset-v2.yml
+    uses: ./.github/workflows/eset.yml
     with:
-      account: ${{ needs.prepare-params.outputs.account }}
-      key: ${{ needs.prepare-params.outputs.key }}
-      mail: ${{ needs.prepare-params.outputs.mail }}
-      key_type: ${{ needs.prepare-params.outputs.key_type }}
-      os: ${{ needs.prepare-params.outputs.os }}
-      branch: ${{ needs.prepare-params.outputs.branch }}
+      account: '0'
+      key: '1'
+      mail: fakemail
+      key_type: --vpn-codes
+      os: Linux
+      branch: main
 
-  email-summary:
+  send-email:
     needs: call-eset
     runs-on: ubuntu-latest
     steps:
-      - name: Send email
+      - name: Send result email
         uses: dawidd6/action-send-mail@v3
         with:
-          server_address: smtp.example.com
+          server_address: smtp.gmail.com # 可换为你自用邮箱服务
           server_port: 465
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "[ESET] Monthly KeyGen Summary"
+          secure: true
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: GitHub Action Key Generation Report
           to: ${{ github.repository_owner }}
-          from: github-actions@example.com
-          body: |
-            Hello ${{ github.repository_owner }},
-
-            The following is the summary output from your key generation run:
-
-            ${{ needs.call-eset.outputs.summary }}
+          from: "GitHub Action <${{ secrets.EMAIL_USERNAME }}>"
           content_type: text/plain
+          body: |
+            GitHub Action 执行完毕，请查看 Summary 页面获取完整 Key 内容：
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
